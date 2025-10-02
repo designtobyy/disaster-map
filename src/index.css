@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* small helper for floating button */
+.fab {
+  @apply fixed bottom-6 right-6 bg-indigo-600 text-white rounded-full p-4 shadow-lg z-50;
+}
