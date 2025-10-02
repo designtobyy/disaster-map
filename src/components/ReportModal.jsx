@@ -1,69 +1,109 @@
-import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import React, { useEffect, useState } from 'react'
+import ReactDOM from 'react-dom'
 import { supabase } from '../supabaseClient'
 
 export default function ReportModal({ open, onClose, initialLocation, onSubmitted, user, showToast }) {
   const [type, setType] = useState('Flood')
   const [severity, setSeverity] = useState(3)
   const [description, setDescription] = useState('')
-  const [location, setLocation] = useState(initialLocation)
+  const [location, setLocation] = useState(initialLocation ?? { lat: '', lng: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
+  // Sync location when user clicks on the map
   useEffect(() => {
-    setLocation(initialLocation)
+    if (initialLocation) setLocation(initialLocation)
   }, [initialLocation])
+
+  // Reset modal when closed
+  useEffect(() => {
+    if (!open) {
+      setType('Flood')
+      setSeverity(3)
+      setDescription('')
+      setLocation(initialLocation ?? { lat: '', lng: '' })
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [open, initialLocation])
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!location) return alert('Please select a location on the map')
-
     setSubmitting(true)
+    setError(null)
 
     const payload = {
       type,
       severity,
       description,
-      latitude: location.lat,
-      longitude: location.lng,
+      latitude: Number(location.lat),
+      longitude: Number(location.lng),
       reporter: user?.email || 'Guest',
     }
 
-    const { data, error } = await supabase.from('reports').insert(payload).select().single()
-    if (error) {
-      console.error(error)
-      alert('Failed to submit report: ' + error.message)
+    try {
+      const { data, error: insertErr } = await supabase.from('reports').insert([payload]).select()
+      if (insertErr) {
+        setError(insertErr.message || 'Failed to submit report')
+        showToast?.('Failed to submit report')
+      } else {
+        const created = Array.isArray(data) ? data[0] : data
+        showToast?.('Report submitted')
+        onSubmitted?.(created)
+        onClose?.()
+      }
+    } catch (err) {
+      setError(err.message || 'Unexpected error')
+      showToast?.('Unexpected error')
+    } finally {
       setSubmitting(false)
-      return
     }
-    onSubmitted(data)
-    onClose()
-    setSubmitting(false)
-    if (showToast) showToast('Report submitted')
   }
 
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose}></div>
-      <motion.div
-        initial={{ y: 200, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 200, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="bg-white rounded-t-xl md:rounded-xl w-full md:w-1/3 p-4 z-50"
+  const modal = (
+    <div
+      className="fixed inset-0 z-[99999] flex items-end md:items-center justify-center"
+      aria-modal="true"
+      role="dialog"
+    >
+      {/* backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+        data-testid="modal-backdrop"
+      />
+
+      {/* modal form */}
+      <form
+        className="relative bg-white rounded-t-xl md:rounded-xl w-full md:w-1/3 p-4 z-50"
+        onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold mb-2">Report Disaster</h3>
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {/* header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Report Disaster</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-gray-600 hover:text-gray-900"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4">
           {/* Type */}
-          <label htmlFor="disaster-type" className="block">
-            <div className="text-sm">Type</div>
+          <div>
+            <label htmlFor="disaster-type" className="block text-sm font-medium text-gray-700">Disaster Type</label>
             <select
               id="disaster-type"
               name="type"
-              className="w-full border rounded p-2"
               value={type}
               onChange={(e) => setType(e.target.value)}
+              className="mt-1 block w-full rounded border-gray-300 p-2"
             >
               <option>Typhoon</option>
               <option>Flood</option>
@@ -71,14 +111,11 @@ export default function ReportModal({ open, onClose, initialLocation, onSubmitte
               <option>Fire</option>
               <option>Landslide</option>
             </select>
-          </label>
+          </div>
 
           {/* Severity */}
-          <label htmlFor="severity" className="block">
-            <div className="flex justify-between text-sm">
-              <span>Severity</span>
-              <span className="text-xs text-gray-500">{severity}</span>
-            </div>
+          <div>
+            <label htmlFor="severity" className="block text-sm font-medium text-gray-700">Severity: {severity}</label>
             <input
               id="severity"
               name="severity"
@@ -87,55 +124,80 @@ export default function ReportModal({ open, onClose, initialLocation, onSubmitte
               max="5"
               value={severity}
               onChange={(e) => setSeverity(Number(e.target.value))}
+              className="mt-1 w-full"
             />
-          </label>
+          </div>
 
           {/* Description */}
-          <label htmlFor="description" className="block">
-            <div className="text-sm">Description</div>
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
             <textarea
               id="description"
               name="description"
-              className="w-full border rounded p-2"
-              rows={4}
+              rows="3"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              className="mt-1 block w-full rounded border-gray-300 p-2"
+              placeholder="Short description of the situation"
+              required
             />
-          </label>
+          </div>
 
-          {/* Location (read-only fields) */}
+          {/* Location */}
           <div>
-            <div className="text-sm mb-1">Location</div>
-            <div className="text-xs text-gray-600">Click on the map to set location</div>
-            <div className="mt-2 text-sm">
-              {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'No location selected'}
+            <label className="block text-sm font-medium text-gray-700">Location</label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <input
+                id="location-lat"
+                name="latitude"
+                type="text"
+                value={location.lat ?? ''}
+                onChange={(e) => setLocation((l) => ({ ...l, lat: e.target.value }))}
+                className="rounded border-gray-300 p-2"
+                placeholder="Latitude (click map to set)"
+                required
+              />
+              <input
+                id="location-lng"
+                name="longitude"
+                type="text"
+                value={location.lng ?? ''}
+                onChange={(e) => setLocation((l) => ({ ...l, lng: e.target.value }))}
+                className="rounded border-gray-300 p-2"
+                placeholder="Longitude (click map to set)"
+                required
+              />
             </div>
-
-            {/* Hidden inputs to ensure values are included in form submission if needed */}
-            <input type="hidden" id="latitude" name="latitude" value={location?.lat ?? ''} readOnly />
-            <input type="hidden" id="longitude" name="longitude" value={location?.lng ?? ''} readOnly />
+            <p className="text-xs text-gray-500 mt-1">
+              Tip: click on the map to pick a location (the app will set these fields if you clicked the map first).
+            </p>
           </div>
 
-          {/* Buttons */}
-          <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              className="px-4 py-2 bg-gray-200 rounded"
-              onClick={onClose}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50"
-              disabled={submitting}
-            >
-              {submitting ? 'Submitting...' : 'Submit Report'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
+          {/* Error */}
+          {error && <div className="text-sm text-red-600">{error}</div>}
+        </div>
+
+        {/* Footer buttons */}
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded bg-gray-100 text-gray-800"
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 rounded bg-indigo-600 text-white disabled:opacity-60"
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting...' : 'Submit Report'}
+          </button>
+        </div>
+      </form>
     </div>
   )
+
+  return (typeof document !== 'undefined') ? ReactDOM.createPortal(modal, document.body) : modal
 }

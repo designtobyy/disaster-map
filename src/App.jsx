@@ -8,6 +8,7 @@ export default function App() {
   console.log('App mounted')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState(null)
+  const [user, setUser] = useState(null)
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
@@ -66,6 +67,20 @@ export default function App() {
           }).subscribe()
           channel = sub
           console.log('Subscribed (legacy) to realtime:', sub)
+        }
+        // read current auth session (if any)
+        try {
+          const sess = await supabase.auth.getSession()
+          // supabase.auth.getSession() returns { data: { session } }
+          const session = sess?.data?.session ?? sess?.session ?? null
+          if (session?.user) {
+            setUser(session.user)
+            console.log('Auth session detected for user:', session.user.email ?? session.user.id)
+          } else {
+            console.log('No active auth session')
+          }
+        } catch (e) {
+          console.warn('Failed to get auth session', e)
         }
       } catch (err) {
         console.warn('Realtime subscribe failed', err)
