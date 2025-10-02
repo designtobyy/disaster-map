@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaf
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../supabaseClient'
-import { IconMapPin } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 import HeatmapLayer from './HeatmapLayer'
 
 // Fix default icon paths
@@ -43,7 +43,7 @@ export default function MapView({ reports, onMapClick, heatmap }) {
             <Popup>
               <div className="min-w-[200px]">
                 <div className="flex items-center gap-2">
-                  <IconMapPin className="h-5 w-5 text-red-600" />
+                  <MapPin className="h-5 w-5 text-red-600" />
                   <strong>{r.type}</strong>
                 </div>
                 <div>Severity: {r.severity}</div>
