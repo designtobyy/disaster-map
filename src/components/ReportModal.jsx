@@ -55,9 +55,16 @@ export default function ReportModal({ open, onClose, initialLocation, onSubmitte
       >
         <h3 className="text-lg font-semibold mb-2">Report Disaster</h3>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <label className="block">
+          {/* Type */}
+          <label htmlFor="disaster-type" className="block">
             <div className="text-sm">Type</div>
-            <select className="w-full border rounded p-2" value={type} onChange={(e) => setType(e.target.value)}>
+            <select
+              id="disaster-type"
+              name="type"
+              className="w-full border rounded p-2"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            >
               <option>Typhoon</option>
               <option>Flood</option>
               <option>Earthquake</option>
@@ -66,28 +73,66 @@ export default function ReportModal({ open, onClose, initialLocation, onSubmitte
             </select>
           </label>
 
-          <label className="block">
+          {/* Severity */}
+          <label htmlFor="severity" className="block">
             <div className="flex justify-between text-sm">
               <span>Severity</span>
               <span className="text-xs text-gray-500">{severity}</span>
             </div>
-            <input type="range" min="1" max="5" value={severity} onChange={(e) => setSeverity(Number(e.target.value))} />
+            <input
+              id="severity"
+              name="severity"
+              type="range"
+              min="1"
+              max="5"
+              value={severity}
+              onChange={(e) => setSeverity(Number(e.target.value))}
+            />
           </label>
 
-          <label className="block">
+          {/* Description */}
+          <label htmlFor="description" className="block">
             <div className="text-sm">Description</div>
-            <textarea className="w-full border rounded p-2" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <textarea
+              id="description"
+              name="description"
+              className="w-full border rounded p-2"
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </label>
 
+          {/* Location (read-only fields) */}
           <div>
             <div className="text-sm mb-1">Location</div>
             <div className="text-xs text-gray-600">Click on the map to set location</div>
-            <div className="mt-2 text-sm">{location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'No location selected'}</div>
+            <div className="mt-2 text-sm">
+              {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'No location selected'}
+            </div>
+
+            {/* Hidden inputs to ensure values are included in form submission if needed */}
+            <input type="hidden" id="latitude" name="latitude" value={location?.lat ?? ''} readOnly />
+            <input type="hidden" id="longitude" name="longitude" value={location?.lng ?? ''} readOnly />
           </div>
 
+          {/* Buttons */}
           <div className="flex gap-2 justify-end">
-            <button type="button" className="px-4 py-2 bg-gray-200 rounded" onClick={onClose} disabled={submitting}>Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Report'}</button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-200 rounded"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50"
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting...' : 'Submit Report'}
+            </button>
           </div>
         </form>
       </motion.div>

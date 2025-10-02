@@ -5,4 +5,4 @@
 [[headers]]
   for = "/*"
   [headers.values]
-  Content-Security-Policy = "default-src 'self' https://*.supabase.co https://*.supabase.insecure; img-src * data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  Content-Security-Policy = "default-src 'self'; connect-src 'self' https://*.supabase.co https://*.supabase.insecure wss://*.supabase.co wss://*.supabase.insecure; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; frame-src https://*.supabase.co;"
