@@ -1,0 +1,2 @@
+/*
+  Content-Security-Policy: default-src 'self' https://*.supabase.co https://*.supabase.insecure; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src * data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'
