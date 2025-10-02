@@ -5,6 +5,7 @@ import { supabase } from './supabaseClient'
 import './index.css'
 
 export default function App() {
+  console.log('App mounted')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [reports, setReports] = useState([])
@@ -15,26 +16,28 @@ export default function App() {
   useEffect(() => {
     let channel = null
     async function loadReports() {
+      console.log('Loading reports from Supabase...')
       setLoading(true)
       try {
-        const { data, error } = await supabase
-          .from('reports')
-          .select('*')
-          .order('created_at', { ascending: false })
-        if (error) {
-          console.error('Error fetching reports', error)
+        const res = await supabase.from('reports').select('*').order('created_at', { ascending: false })
+        console.log('fetch result:', res)
+        const data = res.data ?? res
+        const err = res.error ?? res
+        if (err && err.message) {
+          console.error('Error fetching reports:', err)
           setToast('Failed to load reports')
         } else {
           setReports(data ?? [])
+          console.log('Reports loaded:', data?.length ?? 0)
         }
       } catch (err) {
-        console.error(err)
+        console.error('Unexpected error loading reports:', err)
         setToast('Unexpected error loading reports')
       } finally {
         setLoading(false)
       }
 
-      // realtime subscription (supports Supabase JS v2 channel API; fallback may vary)
+      // Realtime subscription with logging
       try {
         if (typeof supabase.channel === 'function') {
           channel = supabase
@@ -43,38 +46,26 @@ export default function App() {
               'postgres_changes',
               { event: '*', schema: 'public', table: 'reports' },
               (payload) => {
+                console.log('Realtime payload:', payload)
                 const ev = payload.eventType ?? payload.event
-                if (ev === 'INSERT') {
-                  setReports((prev) => [payload.new, ...prev])
-                } else if (ev === 'UPDATE') {
-                  setReports((prev) =>
-                    prev.map((r) => (r.id === payload.new.id ? payload.new : r))
-                  )
-                } else if (ev === 'DELETE') {
-                  setReports((prev) => prev.filter((r) => r.id !== payload.old.id))
-                }
+                if (ev === 'INSERT') setReports((prev) => [payload.new, ...prev])
+                if (ev === 'UPDATE') setReports((prev) => prev.map((r) => (r.id === payload.new.id ? payload.new : r)))
+                if (ev === 'DELETE') setReports((prev) => prev.filter((r) => r.id !== payload.old.id))
               }
             )
             .subscribe()
+          console.log('Subscribed to realtime channel:', channel)
         } else if (supabase.from) {
-          // older client fallback
-          const sub = supabase
-            .from('reports')
-            .on('*', (payload) => {
-              if (payload.eventType === 'INSERT' || payload.event === 'INSERT') {
-                setReports((prev) => [payload.new ?? payload.record, ...prev])
-              } else if (payload.eventType === 'UPDATE' || payload.event === 'UPDATE') {
-                setReports((prev) =>
-                  prev.map((r) =>
-                    r.id === (payload.new?.id ?? payload.record?.id) ? (payload.new ?? payload.record) : r
-                  )
-                )
-              } else if (payload.eventType === 'DELETE' || payload.event === 'DELETE') {
-                setReports((prev) => prev.filter((r) => r.id !== (payload.old?.id ?? payload.record?.id)))
-              }
-            })
-            .subscribe()
+          // fallback older API
+          const sub = supabase.from('reports').on('*', (payload) => {
+            console.log('Legacy realtime payload:', payload)
+            const rec = payload.new ?? payload.record
+            if (payload.event === 'INSERT' || payload.eventType === 'INSERT') setReports((prev) => [rec, ...prev])
+            if (payload.event === 'UPDATE' || payload.eventType === 'UPDATE') setReports((prev) => prev.map((r) => (r.id === rec.id ? rec : r)))
+            if (payload.event === 'DELETE' || payload.eventType === 'DELETE') setReports((prev) => prev.filter((r) => r.id !== (payload.old?.id ?? payload.record?.id)))
+          }).subscribe()
           channel = sub
+          console.log('Subscribed (legacy) to realtime:', sub)
         }
       } catch (err) {
         console.warn('Realtime subscribe failed', err)
@@ -84,41 +75,52 @@ export default function App() {
     loadReports()
 
     return () => {
-      // cleanup realtime subscription
+      console.log('Cleaning up realtime subscription')
       try {
         if (channel?.unsubscribe) channel.unsubscribe()
         else if (channel) supabase.removeChannel?.(channel)
       } catch (e) {
-        // ignore
+        console.warn('Error cleaning channel', e)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // map click handler
+  // Map click handler (MapView should call this)
   function handleMapClick(loc) {
+    console.log('Map clicked at', loc)
     setSelectedLocation(loc)
     setIsModalOpen(true)
   }
 
   // called by ReportModal after successful submit
   function handleSubmitted(newReport) {
+    console.log('Report submitted callback received:', newReport)
     if (newReport) setReports((r) => [newReport, ...r])
     showToast('Report submitted')
   }
 
   function showToast(msg) {
+    console.log('Toast:', msg)
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
   }
 
-  // debug FAB click (keeps UX if map overlay still catches clicks)
+  // ensure FAB works
   function handleFabClick() {
+    console.log('FAB clicked')
     setIsModalOpen(true)
+  }
+
+  // test helper: open modal with sample location so you can exercise the submit flow
+  function openTestModal() {
+    setSelectedLocation({ lat: 14.5995, lng: 120.9842 }) // Manila sample
+    setIsModalOpen(true)
+    console.log('Test modal opened with sample Manila location')
   }
 
   return (
     <div className="min-h-screen h-screen w-screen relative">
-      {/* Top controls */}
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
         <button
           type="button"
@@ -127,16 +129,17 @@ export default function App() {
         >
           {heatmap ? 'Show Markers' : 'Show Heatmap'}
         </button>
+        <button
+          type="button"
+          className="px-3 py-2 rounded bg-yellow-100 shadow text-sm"
+          onClick={openTestModal}
+        >
+          Open Test Modal
+        </button>
       </div>
 
-      {/* Map */}
-      <MapView
-        reports={reports}
-        onMapClick={handleMapClick}
-        heatmap={heatmap}
-      />
+      <MapView reports={reports} onMapClick={handleMapClick} heatmap={heatmap} />
 
-      {/* Floating Action Button */}
       <button
         type="button"
         className="fab"
@@ -146,21 +149,18 @@ export default function App() {
         Report Disaster
       </button>
 
-      {/* Loading indicator */}
       {loading && (
         <div className="absolute top-4 left-4 z-50 bg-white/80 px-3 py-2 rounded shadow text-sm">
           Loading…
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-black text-white px-4 py-2 rounded">
           {toast}
         </div>
       )}
 
-      {/* Report modal */}
       <ReportModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
